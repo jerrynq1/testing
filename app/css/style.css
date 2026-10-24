@@ -305,3 +305,13 @@ body.sc .usr .lb{display:none}
 .bar a.btn{text-decoration:none;display:inline-block}
 .cfacc{display:flex;flex-direction:column;align-items:center;gap:2px;margin:0 0 12px}
 .cfacc b{font-size:16px;letter-spacing:.04em;color:var(--acc)}
+
+/* Sidebar dài (11 mục + chân sidebar): chỉ danh sách mục cuộn, đầu và chân (user, Trang chủ, ngôn ngữ, giao diện, đăng xuất) luôn hiện */
+#side{overflow:hidden}
+#side .sh,#side .sf{flex:none}
+#side nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-width:thin;scrollbar-color:var(--line) transparent;padding:2px 2px 8px;margin:0 -2px;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 8px,#000 calc(100% - 18px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 8px,#000 calc(100% - 18px),transparent 100%)}
+#side nav::-webkit-scrollbar{width:4px}
+#side nav::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+#side .sf{max-height:46vh;overflow-y:auto;overscroll-behavior:contain}
+#side nav>.sb{flex:none}

@@ -44,7 +44,7 @@ html.emb body::before,html.emb #sky,html.emb #side,html.emb .topbar,html.emb .sc
 html.emb body{min-height:0}
 html.emb .main{margin-left:0}
 html.emb .wrap{max-width:none;padding:6px}
-html.emb body:not([data-v="chart"]) #embBack{display:inline-flex;margin:4px 0 10px}
+html.emb body:not([data-v="chart"]):not([data-v="tpo"]) #embBack{display:inline-flex;margin:4px 0 10px}
 html.emb #v-chart.on{display:flex;flex-direction:column;height:100vh;height:100dvh;min-height:0}
 html.emb #v-chart>.card.bar{flex:none;padding:6px 8px;gap:6px}
 html.emb #chartCard{flex:1 1 auto;height:auto!important;min-height:0;margin-top:6px}
@@ -101,3 +101,36 @@ body.mcfs #side,body.mcfs .topbar{display:none!important}
 
 /* Bỏ dòng trạng thái "1375 M1 candles · cTrader" (chart tự tải thêm khi kéo): chỉ hiện khi có lỗi (.bad), áp dụng cho cả chart chính và chart phụ */
 #v-chart #st:not(.bad){display:none!important}
+
+
+/* ===== Nhiều TPO (nút "Thêm TPO chart"): dùng lại giao diện thẻ của chart phụ, chỉ đổi id #mc* -> #mt* ===== */
+#mt{display:none;margin-top:14px}
+#v-tpo.on~#mt{display:block}
+#mtGrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,540px),1fr))}
+#mtGrid.c1{grid-template-columns:1fr}
+.mca button,#mtCols button{width:32px;height:32px;display:grid;place-items:center;padding:0;border:0;border-radius:9px;background:none;color:var(--mut);cursor:pointer}
+.mca button:hover,#mtCols button:hover{background:var(--inp);color:var(--ink)}
+.mca svg,#mtCols svg,#mtAdd svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#mtAdd{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-style:dashed;border-radius:14px}
+#mtAdd:disabled{opacity:.45;cursor:not-allowed}
+#mt:not(.has) #mtAdd{width:100%;justify-content:center;padding:22px;font-size:15px}
+#mt:not(.has) .mcb>:not(#mtAdd){display:none}
+@media(pointer:coarse){.mca button,#mtCols button{width:40px;height:40px}.mcz{height:24px}.mch{min-height:48px}}
+@media(max-width:760px){#mt{margin-top:10px}#mtGrid{gap:10px}.seg,.mch2{display:none}.mcb{margin-top:10px}}
+html.emb body::before,html.emb #sky,html.emb #side,html.emb .topbar,html.emb .scrim,html.emb #mt,html.emb #v-chart>.card.bar [data-go=cs]{display:none!important}
+html.emb #mtl [data-m=fs]{display:none}
+.mca button svg,#mtCols button svg,#mtAdd svg{display:block;flex:none;fill:none;stroke:currentColor}
+body.tpfs-on #mt{display:none!important}
+html.emb #mt{display:none!important}
+
+/* TPO phụ (iframe ?cid=...&v=tpo): TPO lấp đầy iframe, thanh công cụ gọn, ô chọn mã nằm trong thanh công cụ */
+#v-tpo>.card.bar{position:relative;z-index:12}
+#tpoMode{width:auto;padding:6px 28px 6px 10px;font-size:13px;font-weight:600}
+html.emb #v-tpo.on{display:flex;flex-direction:column;height:100vh;height:100dvh;min-height:0}
+html.emb #v-tpo>.card.bar{flex:none;padding:6px 8px;gap:6px}
+html.emb #tpoCard{flex:1 1 auto;height:auto!important;min-height:0;margin-top:6px}
+html.emb #v-tpo .msg,html.emb #tpoFs,html.emb #tpoSym{display:none}
+html.emt #v-tpo .symw{width:124px;flex:none;margin:0}
+html.emt #v-tpo #sym{padding:6px 28px 6px 10px;font-size:14px}
+html.emb #tpoZo,html.emb #tpoZi,html.emb #tpoSq{display:none}
+html.emb #tpoInfo{font-size:11px}
