@@ -35,7 +35,7 @@ app/
 - `config.js` gộp hai file: `window.GX_CONFIG` (của login.html, maintenance.html dùng chung) và `const CT_CONFIG`.
 - Đã bỏ `trading-journal-discord.zip` (bản đóng gói cũ của signal-bridge, trùng nội dung).
 - **FAQ**: mục FAQ nhỏ ở trang chủ (6 câu) + trang riêng `faq.html` (17 câu, chia nhóm, tìm không dấu, mở/thu gọn tất cả). Sửa nội dung ở `faq-data.js`, mỗi câu gồm `q` và `a` dạng `[Việt, English, 中文]`.
-- Sau mỗi lần sửa file JS/CSS, đổi `?v=38` thành số mới trong `app/index.html`.
+- Sau mỗi lần sửa file JS/CSS, đổi `?v=39` thành số mới trong `app/index.html`.
 
 > **Bảo mật:** `app/js/config.js` được phục vụ công khai. Đừng điền Client Secret / Access Token cTrader vào đây nếu repo hoặc Pages là public; nhập ở tab **Kết nối** (lưu trong trình duyệt) thì an toàn hơn.
 
@@ -58,7 +58,7 @@ Dán `worker.js` vào Worker, gắn D1 database tên `DB`, rồi đặt **2 secr
 | `DISCORD_BOT_TOKEN` | *(tuỳ chọn)* bật kiểm tra lại thành viên định kỳ |
 | `SESSION_DAYS` | *(tuỳ chọn)* thời hạn phiên, mặc định 7 ngày |
 
-Client ID, Server ID và địa chỉ web là thông tin công khai nên đã đặt sẵn trong `DEFAULTS` ở đầu `worker.js` (muốn đổi thì sửa ở đó hoặc thêm biến `DISCORD_CLIENT_ID`, `DISCORD_GUILD_ID`, `FRONTEND_URL` trên Cloudflare).
+Client ID và Server ID là thông tin công khai nên đã đặt sẵn trong `DEFAULTS` ở đầu `worker.js`. **`FRONTEND_URL` (địa chỉ web, không có `/` cuối) PHẢI đặt trên Cloudflare** (Settings > Variables), ví dụ `https://<user>.github.io/<repo>` khi đang test; sau khi đăng nhập Discord, Worker chuyển về `<FRONTEND_URL>/app/index.html`. Khi có domain riêng thì đổi biến này và thêm file `CNAME`.
 
 Secret `TOKEN` cũ không còn dùng, có thể xoá. Bảng `users` được Worker tự tạo; bảng `trades` tự thêm cột `user_id`.
 
@@ -172,7 +172,7 @@ js/
 
 ## Khi sửa file về sau
 
-- Sau mỗi lần sửa, đổi `?v=` (hiện là 38) sang số mới trong `app/index.html` để trình duyệt tải lại file mới.
+- Sau mỗi lần sửa, đổi `?v=` (hiện là 39) sang số mới trong `app/index.html` để trình duyệt tải lại file mới.
 - **Không đổi thứ tự** các dòng `<script>` (các file dùng chung biến toàn cục).
 - Tránh đặt tên biến trùng với tên đã có ở file khác (hai file khai báo cùng một `const` sẽ làm file sau không chạy).
 
@@ -233,3 +233,14 @@ Lỗi cũ: Bid/Ask vẫn nhảy nhưng nến + footprint đứng im. Nguyên nh�
 - `chartWatch()` phát hiện "có giá bid mới nhưng nến > 6s không được cập nhật" và khôi phục theo cấp: dựng lại (6s) -> bù nến M1 (15s) -> tải lại (30s). Cờ `loading` kẹt quá 90s cũng tự tải lại. Thanh trạng thái báo "Chart chậm cập nhật…" khi đang khôi phục.
 - Nến live của phút đang chạy kế thừa open/high/low/volume thật từ lịch sử (trước đó có thể bị thay bằng nến chỉ có 1 giá sau khi tải lại).
 - Gõ `ctDiag()` trong Console khi chart đứng: có thêm `chartChoApDung_s`, `loiGanNhat`, `capHoiPhuc`.
+
+
+## TPO Daily / Weekly / Session và nhiều TPO chart (v39)
+
+- **Loại profile** chọn nhanh trên thanh công cụ tab TPO Chart (ô chọn cạnh nút Live) hoặc ở tab **TPO Setting > Dữ liệu > Loại profile**:
+  - **Daily**: mỗi ngày server (cắt 17:00 New York) một profile, như cũ.
+  - **Weekly**: mỗi tuần một profile (thứ Hai – thứ Sáu theo giờ server, tuần bắt đầu như W1), không có Initial Balance. Chu kỳ mỗi ô mặc định 240 phút, số tuần hiển thị 1–8.
+  - **Session**: mỗi ngày chia **3 phiên Asia / London / New York**, mỗi phiên một profile riêng (POC, Value Area, Single Print, Delta... tính riêng). 3 phiên của cùng một ngày được vẽ **trong một khung** có nhãn ngày, tên phiên nằm dưới từng profile. Giờ bắt đầu phiên tính theo giờ server: Asia từ 00:00, London từ **9** (≈ 07:00 UTC), New York từ **15** (≈ 13:00 UTC), chỉnh được ở TPO Setting (London phải nhỏ hơn New York, sai thì tự về 9 / 15). Chu kỳ mỗi ô mặc định 30 phút, Initial Balance = giờ đầu của phiên.
+- Kích thước hàng giá tự động tính theo loại (≈ 70 hàng cho ngày, 120 cho tuần, 40 cho một phiên); đặt tay ở "Kích thước hàng giá" nếu muốn.
+- **Thêm TPO chart**: nút nằm dưới chart ở tab TPO Chart, làm giống "Thêm chart": tối đa 4 TPO phụ (3 trên điện thoại), mỗi cái là một iframe `index.html?cid=<id>&v=tpo` có **mã và cài đặt TPO riêng** (lưu `tp_tpo_<id>`, khởi đầu bằng cài đặt TPO của chart chính), nên có thể xem Daily, Weekly và Session cạnh nhau. Ô chọn mã nằm ngay trên thanh công cụ của từng TPO phụ; danh sách lưu ở `tp_mct`. Đổi thứ tự, toàn màn hình, xoá (bấm 2 lần), kéo đổi chiều cao như chart phụ.
+- Code: `tpoGroup` / `tpoNorm` (gom nến theo loại) và khung ngày ở `tpoPaint` trong `js/tpo.js`; `js/multichart.js` chạy hai lần (`mcInit`) cho chart và TPO. Test: `node app/tests/tpo.test.js`.

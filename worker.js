@@ -2,7 +2,7 @@
 //
 // Binding bắt buộc : DB (D1 database)
 // Secret bắt buộc  : DISCORD_CLIENT_SECRET, SESSION_SECRET   (chỉ 2 cái này là bí mật thật, KHÔNG ghi vào code)
-// Đã đặt sẵn trong code (là thông tin công khai, xem DEFAULTS bên dưới): DISCORD_CLIENT_ID, DISCORD_GUILD_ID, FRONTEND_URL
+// Đã đặt sẵn trong code (là thông tin công khai, xem DEFAULTS bên dưới): DISCORD_CLIENT_ID, DISCORD_GUILD_ID. FRONTEND_URL thì tự đặt trên Cloudflare
 //   -> muốn đổi thì chỉ cần thêm biến cùng tên trên Cloudflare, giá trị trên Cloudflare sẽ ghi đè.
 // Secret tuỳ chọn  : DISCORD_ROLE_ID   (chỉ cho role này vào; nhiều role cách nhau dấu phẩy)
 //                    DISCORD_BOT_TOKEN (bot trong server, dùng kiểm tra lại thành viên mỗi 10 phút để đá người đã rời/bị kick)
@@ -29,12 +29,13 @@ const TERMS_VERSION = "2026-10-20-2";
 const DEFAULTS = {
   DISCORD_CLIENT_ID: "1562015837739683850",
   DISCORD_GUILD_ID: "1562048805522903062",
-  FRONTEND_URL: "https://www.gexadecimal.dev",
+  // FRONTEND_URL: đặt ở biến môi trường trên Cloudflare (địa chỉ web đang chạy, vd https://<user>.github.io/<repo> khi test). Chưa có domain riêng nên không đặt mặc định.
 };
 const KEYS = ["DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_GUILD_ID", "DISCORD_ROLE_ID", "DISCORD_BOT_TOKEN", "SESSION_SECRET", "SESSION_DAYS", "FRONTEND_URL"];
 const cfg = (raw) => { const e = { DB: raw.DB }; for (const k of KEYS) e[k] = raw[k] || DEFAULTS[k]; return e; };
-// Cho phép cả gexadecimal.dev lẫn www.gexadecimal.dev gọi API
+// Cho phép cả bản có và không có www gọi API
 const corsOrigin = (env, req) => {
+  if (!env.FRONTEND_URL) return req.headers.get("Origin") || "*"; // chưa đặt FRONTEND_URL: cho origin đang gọi (chỉ để báo lỗi cấu hình rõ ràng)
   const o = new URL(env.FRONTEND_URL).origin;
   const alt = new URL(o).hostname.startsWith("www.") ? o.replace("//www.", "//") : o.replace("//", "//www.");
   const r = req.headers.get("Origin");
