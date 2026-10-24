@@ -34,7 +34,7 @@ app/
 - **Phải đăng nhập Discord** mới vào được cả chart (trước đây chart mở thẳng). Chart phụ (iframe `?cid=`) dùng chung phiên, không gọi lại server.
 - `config.js` gộp hai file: `window.GX_CONFIG` (của login.html, maintenance.html dùng chung) và `const CT_CONFIG`.
 - Đã bỏ `trading-journal-discord.zip` (bản đóng gói cũ của signal-bridge, trùng nội dung).
-- **FAQ**: mục FAQ nhỏ ở trang chủ (6 câu) + trang riêng `faq.html` (17 câu, chia nhóm, tìm không dấu, mở/thu gọn tất cả). Sửa nội dung ở `faq-data.js`, mỗi câu gồm `q` và `a` dạng `[Việt, English, 中文]`.
+- **FAQ**: mục FAQ nhỏ ở trang chủ (6 câu) + trang riêng `faq.html` (29 câu, chia 4 nhóm, tìm không dấu, mở/thu gọn tất cả). Sửa nội dung ở `faq-data.js`, mỗi câu gồm `q` và `a` dạng `[Việt, English, 中文]`.
 - Sau mỗi lần sửa file JS/CSS, đổi `?v=39` thành số mới trong `app/index.html`.
 
 > **Bảo mật:** `app/js/config.js` được phục vụ công khai. Đừng điền Client Secret / Access Token cTrader vào đây nếu repo hoặc Pages là public; nhập ở tab **Kết nối** (lưu trong trình duyệt) thì an toàn hơn.
@@ -83,8 +83,9 @@ Mục **Kết nối** có nút **Xoá tài khoản** (cuối thẻ). Bấm vào 
 
 ### Ghi nhận đồng ý Điều khoản
 - `login.html` gửi phiên bản điều khoản đã tích đồng ý lên Worker (`/auth/discord/login?terms=<phiên bản>`); Worker từ chối nếu không khớp `TERMS_VERSION`, rồi ghi `terms_version` + `terms_at` vào bảng `users` và một dòng vào bảng `consents` (lịch sử mỗi lần đồng ý phiên bản mới). Bảng/cột tự tạo khi Worker chạy.
-- Nội dung điều khoản nằm ở **một nơi duy nhất**: `terms.html` (link cố định `/terms.html`, có 3 ngôn ngữ vi/en/zh; `#data` nhảy tới phần dữ liệu). Cửa sổ điều khoản ở `login.html` chỉ nhúng trang này vào, nên không phải sửa hai chỗ. Trang này không nạp Google Fonts. Mục 4 và 5 của điều khoản ghi rõ việc lưu bản ghi đồng ý và các dịch vụ bên thứ ba (Discord, Cloudflare, GitHub Pages, Google Fonts gửi IP sang Google).
-- Khi sửa điều khoản: sửa `terms.html`, rồi đổi `TERMS_VERSION` ở **cả** `worker.js` và `login.html` (cùng giá trị, chỉ gồm chữ số và dấu `-`, ví dụ `2026-10-20-2`); hiển thị phiên bản ở đầu `terms.html` cũng sửa theo. Người dùng cũ sẽ bị đưa về trang đăng nhập để tích đồng ý lại (`/auth/me` trả `terms_ok:false`).
+- `terms.html` gồm **Phần A: Điều khoản sử dụng** (mục s1–s11) và **Phần B: Chính sách quyền riêng tư** (mục `data`, b2–b9; `#data` nhảy tới phần dữ liệu thu thập). Khi thêm tính năng thu thập/lưu dữ liệu mới (dịch vụ bên thứ ba, khoá localStorage, cột D1), nhớ cập nhật B1, B2, B4 và câu FAQ "Dữ liệu của tôi được lưu ở đâu?".
+\1 (link cố định `/terms.html`, có 3 ngôn ngữ vi/en/zh; `#data` nhảy tới phần dữ liệu). Cửa sổ điều khoản ở `login.html` chỉ nhúng trang này vào, nên không phải sửa hai chỗ. Trang này không nạp Google Fonts. Mục 4 và 5 của điều khoản ghi rõ việc lưu bản ghi đồng ý và các dịch vụ bên thứ ba (Discord, Cloudflare, GitHub Pages, Google Fonts gửi IP sang Google).
+- Khi sửa điều khoản: sửa `terms.html`, rồi đổi `TERMS_VERSION` ở **cả** `worker.js` và `login.html` (cùng giá trị, chỉ gồm chữ số và dấu `-`, ví dụ `2026-10-24-1`); hiển thị phiên bản ở đầu `terms.html` cũng sửa theo. Người dùng cũ sẽ bị đưa về trang đăng nhập để tích đồng ý lại (`/auth/me` trả `terms_ok:false`).
 - Tài khoản tạo trước khi có tính năng này chưa có `terms_version`, nên lần mở app tiếp theo sẽ phải đồng ý một lần.
 - Xoá tài khoản cũng xoá luôn các dòng `consents` của người đó.
 - Xem ai đã đồng ý bản nào: `SELECT user_id, version, datetime(accepted_at/1000,'unixepoch') FROM consents ORDER BY accepted_at DESC;`

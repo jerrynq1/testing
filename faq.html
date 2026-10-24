@@ -55,7 +55,7 @@ summary:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-rad
   <div id="list"></div>
   <p id="none"></p>
   <p class="cta" id="cta"></p>
-  <p class="back"><a id="back" href="index.html"></a></p>
+  <p class="back"><a id="terms" href="terms.html"></a> · <a id="back" href="index.html"></a></p>
 </main>
 <script src="faq-data.js"></script>
 <script>
@@ -76,6 +76,7 @@ summary:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-rad
     none: ["Không có câu hỏi nào khớp.", "No matching questions.", "没有匹配的问题。"],
     cta: ["Vẫn chưa tìm thấy câu trả lời? Hỏi trong server Discord của cộng đồng.", "Still can't find your answer? Ask in the community's Discord server.", "还没找到答案？请到社区的 Discord 服务器提问。"],
     back: ["← Về trang chủ", "← Back to home", "← 返回首页"],
+    terms: ["Điều khoản & Quyền riêng tư", "Terms & Privacy Policy", "使用条款与隐私政策"],
     doc: ["Câu hỏi thường gặp – Gexadecimal", "FAQ – Gexadecimal", "常见问题 – Gexadecimal"]
   };
   var $ = function (id) { return document.getElementById(id); };
@@ -106,7 +107,7 @@ summary:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-rad
     lang = l; root.dataset.l = l; root.lang = l; var i = IX[l];
     document.title = UI.doc[i]; $("h1").textContent = UI.title[i]; $("sub").textContent = UI.sub[i];
     $("q").placeholder = UI.search[i]; $("ex").textContent = UI.ex[i]; $("co").textContent = UI.co[i];
-    $("none").textContent = UI.none[i]; $("cta").textContent = UI.cta[i]; $("back").textContent = UI.back[i];
+    $("none").textContent = UI.none[i]; $("cta").textContent = UI.cta[i]; $("back").textContent = UI.back[i]; $("terms").textContent = UI.terms[i];
     Array.prototype.forEach.call(document.querySelectorAll(".bar button[data-l]"), function (b) { b.classList.toggle("on", b.dataset.l === l); });
     build(); if (save) sv("gx-lang", l);
   }

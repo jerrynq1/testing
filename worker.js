@@ -23,7 +23,7 @@ const enc = new TextEncoder();
 const CHECK_MS = 10 * 60 * 1000;
 // Phiên bản Điều khoản hiện hành. Khi sửa nội dung điều khoản: đổi giá trị này VÀ TERMS_VERSION trong login.html
 // -> mọi người dùng cũ sẽ bị yêu cầu đăng nhập lại và tích đồng ý lần nữa.
-const TERMS_VERSION = "2026-10-20-2";
+const TERMS_VERSION = "2026-10-24-1";
 
 // Giá trị CÔNG KHAI nên để sẵn ở đây cho đỡ phải nhập trên Cloudflare
 const DEFAULTS = {
