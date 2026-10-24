@@ -49,3 +49,45 @@ console.log('\n'+n+' kiểm tra đạt');
   ok('vẽ đầy đủ các lớp TPO không lỗi');
 }
 console.log(n+' kiểm tra đạt (gồm vẽ)');
+
+/* ---- Loại profile: Daily / Weekly / Session ---- */
+{
+  const D0=20451;                                         // 20451 = thứ Hai (ngày epoch; thứ Hai khi (ngày+3)%7===0)
+  const mkBars=(days,step)=>{const o=[];for(const d of days)for(let t=0;t<86400;t+=step)o.push([d*86400+t,100,101,99,100,1]);return o};
+  const grp=(bars,s)=>{ctx.GB=bars;ctx.GS=s;return vm.runInContext('(()=>{const r=tpoGroup(GB,GS);return {keys:r.keys,have:r.have,need:r.need,mode:r.mo.mode,sL:r.mo.sL,sN:r.mo.sN}})()',ctx)};
+  const two=[D0,D0+1,D0+2,D0+3,D0+4,D0+7,D0+8];            // T2..T6 + T2, T3 tuần sau
+  let r=grp(mkBars(two,600),{mode:'day',days:3});
+  assert.deepStrictEqual(Array.from(r.keys),[D0+4,D0+7,D0+8]);assert.strictEqual(r.need,4);ok('day: lấy N ngày cuối');
+  r=grp(mkBars(two,600),{mode:'week',weeks:2});
+  assert.deepStrictEqual(Array.from(r.keys),[Math.floor((D0+3)/7),Math.floor((D0+10)/7)]);assert.strictEqual(r.have,2);ok('week: thứ Hai..thứ Sáu cùng một tuần, tuần sau tách riêng');
+  assert.strictEqual(Math.floor((D0+4+3)/7),Math.floor((D0+3)/7));ok('thứ Sáu vẫn thuộc tuần của thứ Hai');
+  r=grp(mkBars([D0],3600),{mode:'session',days:1,sL:9,sN:15});
+  assert.deepStrictEqual(Array.from(r.keys),[D0*4,D0*4+1,D0*4+2]);ok('session: 1 ngày -> 3 phiên (Asia / London / New York)');
+  // ranh giới phiên: 08:59 -> Asia, 09:00 -> London, 14:59 -> London, 15:00 -> New York
+  const at=(h,m)=>[D0*86400+h*3600+m*60,1,1,1,1,1];
+  r=grp([at(8,59),at(9,0),at(14,59),at(15,0),at(23,59)],{mode:'session',days:1,sL:9,sN:15});
+  assert.deepStrictEqual(Array.from(r.keys),[D0*4,D0*4+1,D0*4+2]);
+  ctx.GB=[at(8,59),at(9,0),at(14,59),at(15,0)];
+  const cnt=vm.runInContext('(()=>{const r=tpoGroup(GB,{mode:"session",days:1,sL:9,sN:15});return r.keys.map(k=>r.g.get(k).length)})()',ctx);
+  assert.deepStrictEqual(Array.from(cnt),[1,2,1]);ok('ranh giới phiên đúng (09:00 -> London, 15:00 -> New York)');
+  r=grp(mkBars(two,3600),{mode:'session',days:2,sL:9,sN:15});
+  assert.strictEqual(r.keys.length,6);assert.strictEqual(r.have,7);assert.strictEqual(r.need,3);ok('session: N ngày = 3N profile; have = số ngày');
+  r=grp([at(1,0)],{mode:'session',days:1,sL:20,sN:15});
+  assert.strictEqual(r.sL,9);assert.strictEqual(r.sN,15);ok('giờ phiên sai (London >= New York) -> về mặc định 9 / 15');
+  r=grp([at(1,0)],{mode:'bậy',days:1});assert.strictEqual(r.mode,'day');ok('loại profile lạ -> day');
+  // IB tắt cho profile tuần; có cho ngày/phiên
+  const Bw=[[0,10,12,10,12,5],[PER,10,12,10,12,5]];
+  assert.strictEqual(day(Bw,{ib:0}).ibh,null);assert.strictEqual(day(Bw,{}).ibh,12);ok('o.ib=0 tắt Initial Balance (weekly)');
+  // a0 tuỳ chỉnh: chu kỳ tính từ đầu phiên, không từ đầu ngày
+  const base=9*3600,Bs=[[base,10,11,10,11,5],[base+PER,10,12,10,12,5]];
+  ctx.B=Bs;ctx.O={a0:base};const Ts=vm.runInContext('tpoDay(0,B,1,1800,.7,false,O)',ctx);
+  assert.strictEqual(Math.max(...Array.from(Ts.per).flatMap(a=>Array.from(a))),1);ok('a0: chu kỳ đầu tiên của phiên là A (chỉ số 0)');
+  // vẽ session: khung ngày + 3 phiên không lỗi
+  const g=new Proxy({},{get:(t,k)=>k==='measureText'?(x=>({width:String(x).length*5})):()=>{},set:()=>true});
+  ctx.G=g;ctx.B3=[[0,A],[1,B1],[2,C]];
+  vm.runInContext(`(()=>{const s=Object.assign(tpS(),{mode:"session",cell:16,asp:1}),mk=(i,bars)=>({d:i,g:7,lab:"10-21 Wed",nm:["Asia","London","New York"][i],T:tpoDay(0,bars,1,1800,.7,false,{})}),
+      {L}=tpoLayout([mk(0,[${JSON.stringify(A)},${JSON.stringify(B1)}]),mk(1,[${JSON.stringify(B1)},${JSON.stringify(C)}]),mk(2,[${JSON.stringify(A)},${JSON.stringify(C)}])],s);
+    if(L[1].u<=L[0].u)throw new Error("layout");tpoPaint(G,900,300,66,26,L,{cw:12,rh:12,sx:-8,cp:13,u:1},s,tpoCol(),13,null)})()`,ctx);
+  ok('vẽ khung ngày + 3 phiên không lỗi');
+}
+console.log(n+' kiểm tra đạt (gồm Daily/Weekly/Session)');
