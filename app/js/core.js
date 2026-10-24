@@ -2,7 +2,7 @@ const $=id=>document.getElementById(id);
 /* Chart phụ (nút "Thêm chart"): chạy chính app này trong iframe với ?cid=<id>&sym=..&tf=..
    Mã, khung giờ, indicator của từng chart được lưu riêng (hậu tố _<cid>); theme, múi giờ, màu nến, kết nối cTrader dùng chung. */
 const QS=new URLSearchParams(location.search),CID=(QS.get("cid")||"").replace(/[^\w-]/g,""),EMB=!!CID;
-const PERCH=["tp_sym","tp_tf","tp_ind","tp_lgc"],kk=k=>EMB&&PERCH.includes(k)?k+"_"+CID:k;
+const PERCH=["tp_sym","tp_tf","tp_ind","tp_lgc","tp_tpo"],kk=k=>EMB&&PERCH.includes(k)?k+"_"+CID:k;
 const ld=(k,d)=>{try{return localStorage.getItem(kk(k))??d}catch{return d}};
 const ld0=(k,d)=>{try{return localStorage.getItem(k)??d}catch{return d}};
 const sv=(k,v)=>{try{localStorage.setItem(kk(k),v)}catch{}};

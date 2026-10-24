@@ -22,11 +22,13 @@ addEventListener("storage",ev=>{
   if(ev.key!=="tp_ind_"+CID)return;
   try{ACT=(JSON.parse(ev.newValue||"[]")||[]).filter(a=>a&&IND[a.key]).map(normA);renderInd();if(typeof cur!=="undefined"&&cur==="ind")buildInd()}catch(x){}
 });
-$("embBack").onclick=()=>show("chart");
+const TPOE=QS.get("v")==="tpo";   // chart phụ kiểu TPO: mở thẳng tab TPO, ô chọn mã chuyển lên thanh công cụ TPO
+if(TPOE){const bar=$("v-tpo").querySelector(".bar"),sw=document.querySelector(".symw");if(bar&&sw)bar.insertBefore(sw,bar.firstChild)}
+$("embBack").onclick=()=>show(TPOE?"tpo":"chart");
 /* báo cho trang cha: mã, khung giờ, giá bid (để hiện trên tiêu đề thẻ) */
 let last="";
 function report(){
-  const m={gx:1,cid:CID,sym:C.sym,tf:C.tf,bid:($("bid").textContent||"").trim()},s=JSON.stringify(m);
+  const m={gx:1,cid:CID,sym:C.sym,tf:C.tf,bid:($("bid").textContent||"").trim(),mode:typeof tpS==="function"?tpoNorm(tpS()).mode:""},s=JSON.stringify(m);
   if(s===last)return;last=s;
   try{parent.postMessage(m,location.origin==="null"?"*":location.origin)}catch(e){}
 }

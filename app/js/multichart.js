@@ -1,13 +1,14 @@
-/* ================= THÊM NHIỀU CHART (nút "Thêm chart") =================
+/* ================= THÊM NHIỀU CHART (nút "Thêm chart") và NHIỀU TPO (nút "Thêm TPO chart") =================
+   mcInit(cfg) dựng một bộ chart phụ; gọi hai lần: chart (tab Chart, key tp_mc) và TPO (tab TPO Chart, key tp_mct, iframe có &v=tpo).
    Mỗi chart phụ là một bản đầy đủ của app (footprint, indicator, công cụ vẽ... như chart chính) chạy trong iframe cùng origin,
    xem embed.js để biết cách chúng dùng chung theme / múi giờ / kết nối và lưu riêng mã, khung giờ, indicator.
    Danh sách chart phụ lưu ở localStorage "tp_mc" = {l:[{id,h}], c:số cột}. Thứ tự đổi bằng CSS order (không dựng lại iframe nên chart không bị tải lại). */
-(function(){
+function mcInit(cfg){
 "use strict";
-if(EMB)return;
-const root=$("mc"),grid=$("mcGrid");
+const root=$(cfg.root),grid=$(cfg.grid);
 if(!root||!grid)return;
-const KEY="tp_mc",MQ="(max-width:760px)",narrow=()=>matchMedia(MQ).matches;
+const TPO=cfg.kind==="tpo",KEY=cfg.key,MQ="(max-width:760px)",narrow=()=>matchMedia(MQ).matches;
+const mlbl=x=>x==="week"?"Weekly":x==="session"?"Session":"Daily",modeOf=id=>{try{return mlbl((JSON.parse(ld0("tp_tpo_"+id)||"{}")||{}).mode)}catch{return"Daily"}};
 const maxN=()=>narrow()?3:4;                       // mỗi chart phụ mở thêm 1 kết nối + luồng dữ liệu riêng nên có trần
 let S={l:[],c:2};
 try{const o=JSON.parse(ld(KEY,"{}"))||{};if(Array.isArray(o.l))S.l=o.l.filter(x=>x&&/^[\w-]+$/.test(x.id)).slice(0,4).map(x=>({id:x.id,h:+x.h||0}));if(o.c===1)S.c=1}catch{}
@@ -18,13 +19,13 @@ const I={
   fs:'<path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4"/>',fx:'<path d="M8 4v4H4M12 4v4h4M8 16v-4H4M12 16v-4h4"/>',
   x:'<path d="M5 5l10 10M15 5L5 15"/>',plus:'<path d="M10 4v12M4 10h12"/>'};
 const ic=k=>`<svg viewBox="0 0 20 20" aria-hidden="true">${I[k]}</svg>`;
-window.MC={list:()=>S.l.map(x=>{const i=info[x.id]||{};return{id:x.id,sym:i.sym||ld0("tp_sym_"+x.id,""),tf:i.tf?tfName(+i.tf):tfName(+ld0("tp_tf_"+x.id,0))}})};
+if(!TPO)window.MC={list:()=>S.l.map(x=>{const i=info[x.id]||{};return{id:x.id,sym:i.sym||ld0("tp_sym_"+x.id,""),tf:i.tf?tfName(+i.tf):tfName(+ld0("tp_tf_"+x.id,0))}})};
 const defH=()=>narrow()?Math.max(420,Math.min(680,Math.round(innerHeight*.8))):560;
 const uid=()=>"c"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 
 function src(id,sym,tf){
   const base=location.href.split(/[?#]/)[0];
-  return base+"?cid="+encodeURIComponent(id)+"&sym="+encodeURIComponent(sym)+"&tf="+tf;
+  return base+"?cid="+encodeURIComponent(id)+"&sym="+encodeURIComponent(sym)+"&tf="+tf+(TPO?"&v=tpo":"");
 }
 function mk(it,fresh){
   const el=document.createElement("div");el.className="mcc";el.dataset.id=it.id;
@@ -38,14 +39,14 @@ function mk(it,fresh){
     <div class="mcf"></div>
     <div class="mcz" data-a="rz" role="separator" aria-orientation="horizontal" title="Kéo để đổi chiều cao" aria-label="Kéo để đổi chiều cao"></div>`;
   const f=document.createElement("iframe");
-  f.title="Chart phụ";f.setAttribute("allow","fullscreen");f.loading="lazy";
+  f.title=TPO?"TPO phụ":"Chart phụ";f.setAttribute("allow","fullscreen");f.loading="lazy";
   f.src=src(it.id,fresh.sym,fresh.tf);
   el.querySelector(".mcf").appendChild(f);
-  grid.appendChild(el);head(el,fresh.sym,fresh.tf,"");
+  grid.appendChild(el);head(el,fresh.sym,TPO?modeOf(it.id):fresh.tf,"");
   return el;
 }
 function head(el,sym,tf,bid){
-  el.querySelector(".mct b").textContent=sym||"";el.querySelector(".mct i").textContent=tf?tfName(+tf):"";
+  el.querySelector(".mct b").textContent=sym||"";el.querySelector(".mct i").textContent=TPO?"TPO "+(tf||""):(tf?tfName(+tf):"");
   el.querySelector(".mcp").textContent=bid&&bid!=="–"?bid:"";
 }
 function layout(){
@@ -57,18 +58,19 @@ function layout(){
     el.classList.toggle("wide",S.c!==1&&n%2===1&&i===n-1);
     el.querySelector('[data-a="up"]').disabled=i===0;el.querySelector('[data-a="dn"]').disabled=i===n-1;
   });
-  const b=$("mcAdd"),full=n>=maxN();
-  b.disabled=full;b.title=full?"Đã đạt số chart phụ tối đa":"Thêm chart";
-  $("mcN").textContent=n?n+"/"+maxN():"";
+  const b=$(cfg.add),full=n>=maxN();
+  b.disabled=full;b.title=full?"Đã đạt số chart phụ tối đa":(TPO?"Thêm TPO chart":"Thêm chart");
+  $(cfg.n).textContent=n?n+"/"+maxN():"";
   root.classList.toggle("has",n>0);
-  if(document.body.dataset.v==="ind"&&typeof buildInd==="function")buildInd();   // danh sách "chart đích" ở tab Indicator
-  document.querySelectorAll("#mcCols [data-c]").forEach(x=>x.classList.toggle("on",+x.dataset.c===(S.c===1?1:2)));
+  if(!TPO&&document.body.dataset.v==="ind"&&typeof buildInd==="function")buildInd();   // danh sách "chart đích" ở tab Indicator
+  document.querySelectorAll("#"+cfg.cols+" [data-c]").forEach(x=>x.classList.toggle("on",+x.dataset.c===(S.c===1?1:2)));
 }
 function add(){
   if(S.l.length>=maxN())return;
   const prev=S.l.length?info[S.l[S.l.length-1].id]:null;
-  const tf0=prev?+prev.tf:C.tf,L=allTfs().map(t=>t[1]),tf=L.find(s=>s>tf0)||L[L.length-1];   // mặc định: cùng mã, khung giờ lớn hơn 1 bậc (xem đa khung)
+  const tf0=prev?+prev.tf:C.tf,L=allTfs().map(t=>t[1]),tf=TPO?(C.tf>=60?C.tf:900):L.find(s=>s>tf0)||L[L.length-1];   // chart: cùng mã, khung giờ lớn hơn 1 bậc (xem đa khung); TPO không dùng khung giờ
   const it={id:uid(),h:defH()};S.l.push(it);save();
+  if(TPO){try{const v=ld0("tp_tpo","");if(v)localStorage.setItem("tp_tpo_"+it.id,v)}catch(e){}}   // TPO phụ khởi đầu bằng cài đặt TPO của chart chính, sau đó chỉnh riêng
   const el=mk(it,{sym:C.sym,tf});layout();
   requestAnimationFrame(()=>el.scrollIntoView({behavior:"smooth",block:"nearest"}));
 }
@@ -140,14 +142,18 @@ grid.addEventListener("pointerup",rzEnd);grid.addEventListener("pointercancel",r
 addEventListener("message",e=>{
   const m=e.data;if(!m||m.gx!==1||e.origin!==location.origin&&location.origin!=="null")return;
   const el=grid.querySelector(`[data-id="${m.cid}"]`);if(!el)return;
-  const ch=!info[m.cid]||info[m.cid].sym!==m.sym||info[m.cid].tf!==m.tf;info[m.cid]={sym:m.sym,tf:m.tf,bid:m.bid};head(el,m.sym,m.tf,m.bid);
-  if(ch&&document.body.dataset.v==="ind"&&typeof buildInd==="function")buildInd();
+  const ch=!info[m.cid]||info[m.cid].sym!==m.sym||info[m.cid].tf!==m.tf;info[m.cid]={sym:m.sym,tf:m.tf,bid:m.bid};head(el,m.sym,TPO?mlbl(m.mode):m.tf,m.bid);
+  if(!TPO&&ch&&document.body.dataset.v==="ind"&&typeof buildInd==="function")buildInd();
 });
 
-$("mcAdd").onclick=add;
-$("mcCols").onclick=e=>{const b=e.target.closest("[data-c]");if(!b)return;S.c=+b.dataset.c===1?1:2;save();layout()};
+$(cfg.add).onclick=add;
+$(cfg.cols).onclick=e=>{const b=e.target.closest("[data-c]");if(!b)return;S.c=+b.dataset.c===1?1:2;save();layout()};
 matchMedia(MQ).addEventListener("change",layout);
 
 S.l.forEach(it=>mk(it,{sym:ld0("tp_sym_"+it.id,C.sym),tf:+ld0("tp_tf_"+it.id,C.tf)}));    // sym/tf chỉ là mặc định; chart đã có thì dùng giá trị riêng đã lưu (tp_sym_<id>, tp_tf_<id>)
 layout();
-})();
+}
+if(!EMB){
+  mcInit({kind:"chart",root:"mc",grid:"mcGrid",add:"mcAdd",n:"mcN",cols:"mcCols",key:"tp_mc"});
+  mcInit({kind:"tpo",root:"mt",grid:"mtGrid",add:"mtAdd",n:"mtN",cols:"mtCols",key:"tp_mct"});
+}

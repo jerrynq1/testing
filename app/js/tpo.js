@@ -1,8 +1,10 @@
 /* ===== TPO Chart (Market Profile) =====
    Dữ liệu: m1 của chart chính (m1[i] = [giờ server, open, high, low, close, tickVolume]); ngày = ngày server (cắt 17:00 NY như D1), mỗi ô = 1 nến TPO (mặc định 30 phút).
    Delta Profile: có tick (FPM) thì dùng Ask/Bid thật từ tick, không có thì mô hình đường đi của giá trong nến M1 (giống volume-profile.js): đoạn lên = mua, đoạn xuống = bán.
-   Value Area theo CME (so 2 hàng trên với 2 hàng dưới). Cài đặt riêng nằm ở tab "TPO Setting" (lưu ở "tp_tpo"). */
-const TPO_D={cell:14,asp:1,lt:true,basis:0,spMin:2,showIB:true,showStruct:true,tick:0,per:30,va:70,days:5,cyc:12,outA:.4,stops:null,showSp:true,showExt:true,showDelta:true,showLbl:true,showOC:true};
+   Value Area theo CME (so 2 hàng trên với 2 hàng dưới). Cài đặt riêng nằm ở tab "TPO Setting" (lưu ở "tp_tpo").
+   Loại profile (mode): day = mỗi ngày server một profile; week = mỗi tuần (thứ Hai -> thứ Sáu, tuần bắt đầu theo giờ server như W1); session = mỗi ngày chia 3 phiên
+   (Asia từ 00:00, London từ sL, New York từ sN, giờ server) mỗi phiên một profile riêng, 3 phiên của cùng một ngày được vẽ trong một khung. */
+const TPO_D={cell:14,asp:1,lt:true,basis:0,spMin:2,showIB:true,showStruct:true,tick:0,per:30,va:70,days:5,cyc:12,outA:.4,stops:null,showSp:true,showExt:true,showDelta:true,showLbl:true,showOC:true,mode:"day",weeks:4,perW:240,perS:30,sL:9,sN:15};
 let TPO_S={};try{TPO_S=JSON.parse(ld("tp_tpo","{}"))||{}}catch{}
 const tpS=()=>Object.assign({},TPO_D,TPO_S),saveTP=()=>sv("tp_tpo",JSON.stringify(TPO_S));
 const tvar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -33,9 +35,9 @@ function tpoDay(d,B,tk,ps,vaP,useTk,o){
   const U=1e5,bI=Math.max(1,Math.round(tk*U)),I=x=>Math.round(x*U),clamp=(x,a,b)=>x<a?a:x>b?b:x;
   let pmin=Infinity,pmax=-Infinity,h=-Infinity,l=Infinity;
   for(const x of B){pmin=Math.min(pmin,I(x[3]));pmax=Math.max(pmax,I(x[2]));h=Math.max(h,x[2]);l=Math.min(l,x[3])}
-  const b0=Math.floor(pmin/bI),n=Math.floor(pmax/bI)-b0+1,row=p=>Math.floor(p/bI)-b0,a0=d*86400;
+  const b0=Math.floor(pmin/bI),n=Math.floor(pmax/bI)-b0+1,row=p=>Math.floor(p/bI)-b0,a0=o.a0!=null?o.a0:d*86400;
   const per=Array.from({length:n},()=>new Set()),vol=new Float64Array(n),dl=new Float64Array(n);
-  const ibN=Math.max(1,Math.ceil(3600/ps));let ibh=-Infinity,ibl=Infinity;   // Initial Balance = giờ đầu tiên của ngày
+  const ibSec=o.ib==null?3600:o.ib,ibN=ibSec>0?Math.max(1,Math.ceil(ibSec/ps)):0;let ibh=-Infinity,ibl=Infinity;   // Initial Balance = giờ đầu tiên của ngày / phiên (o.ib giây; 0 = không có IB, dùng cho profile tuần)
   const seg=(pa,pb,v)=>{const a=Math.min(pa,pb),b=Math.max(pa,pb),len=b-a,up=pb>pa;
     for(let j=Math.floor(a/bI);j<=Math.ceil(b/bI)-1;j++){const r0=j*bI,ov=Math.min(b,r0+bI)-Math.max(a,r0);if(ov<=0)continue;const q=v*ov/len;vol[j-b0]+=q;dl[j-b0]+=up?q:-q}};
   for(const x of B){
@@ -81,24 +83,51 @@ function tpoDay(d,B,tk,ps,vaP,useTk,o){
   return{lo:b0,bp:bI/U,n,per:pl,cnt,vol,dl,dp,poc,vl:b,vh:t,sp,oR,cR,tU,h,l,open:B[0][1],close:B[B.length-1][4],dsum:dl.reduce((a,c)=>a+c,0),vsum,
     ibh:ibh>-Infinity?ibh:null,ibl:ibl<Infinity?ibl:null,poorH,poorL,shape:tpoShape(cnt,n,poc),byV};
 }
-const TPC={sig:"",days:[],u:0,have:0,tkKey:"",tkv:0};
+const TPC={sig:"",days:[],u:0,have:0,need:0,tkKey:"",tkv:0};
+/* ---- Gom nến M1 thành các nhóm profile theo loại (day / week / session) ----
+   Khoá nhóm: day = số ngày epoch; week = floor((ngày+3)/7) (thứ Hai là đầu tuần); session = ngày*4 + chỉ số phiên (0 Asia, 1 London, 2 New York).
+   Trả về {keys: các nhóm đang hiển thị (tăng dần), g: Map khoá -> nến, have: số ngày/tuần đã có, need: cần tối thiểu bao nhiêu để vẽ đủ}. */
+const TPM_NAME={day:"Daily",week:"Weekly",session:"Session"},TPM_SESS=["Asia","London","New York"],TPM_DIV={day:70,week:120,session:40};
+function tpoNorm(s){
+  const mode=s.mode==="week"||s.mode==="session"?s.mode:"day";let L=Math.round(+s.sL),N=Math.round(+s.sN);
+  if(!(L>=1&&N<=23&&L<N)){L=9;N=15}   // giờ bắt đầu phiên không hợp lệ -> mặc định
+  return{mode,sL:L,sN:N};
+}
+const tpoPer=s=>{const m=tpoNorm(s).mode;return +(m==="week"?s.perW:m==="session"?s.perS:s.per)||30};
+const tpoSess=(t,mo)=>{const h=(t%86400)/3600;return h>=mo.sN?2:h>=mo.sL?1:0};
+function tpoGroup(bars,s){
+  const mo=tpoNorm(s),g=new Map();
+  for(const b of bars){const d=Math.floor(b[0]/86400),k=mo.mode==="week"?Math.floor((d+3)/7):mo.mode==="session"?d*4+tpoSess(b[0],mo):d;let a=g.get(k);if(!a)g.set(k,a=[]);a.push(b)}
+  const all=[...g.keys()].sort((a,b)=>a-b);let keys,have,want;
+  if(mo.mode==="session"){const dl=[...new Set(all.map(k=>Math.floor(k/4)))];have=dl.length;want=+s.days;const keep=new Set(dl.slice(-want));keys=all.filter(k=>keep.has(Math.floor(k/4)))}
+  else{have=all.length;want=+(mo.mode==="week"?s.weeks:s.days);keys=all.slice(-want)}
+  return{mo,g,keys,have,need:want+1};
+}
 function tpoData(){
   const s=tpS(),N=m1.length;if(!N)return null;
-  const useTk=typeof FPM!=="undefined"&&FPM.size>0,x=m1[N-1],tkKey=C.sym+"|"+s.days+"|"+s.tick+"|"+pd(),sig=[N,m1[0][0],x[0],x[2],x[3],x[4],x[5],s.tick,s.per,s.va,s.days,s.basis,s.spMin,useTk?FPH:0,useTk?FPLV:0,pd(),TPC.tkKey===tkKey?TPC.tkv:0].join();
+  const mo=tpoNorm(s),useTk=typeof FPM!=="undefined"&&FPM.size>0,x=m1[N-1],cnt=mo.mode==="week"?s.weeks:s.days,per=tpoPer(s),
+    tkKey=C.sym+"|"+mo.mode+"|"+cnt+"|"+s.tick+"|"+per+"|"+pd(),
+    sig=[N,m1[0][0],x[0],x[2],x[3],x[4],x[5],s.tick,per,s.va,cnt,s.basis,s.spMin,mo.mode,mo.sL,mo.sN,useTk?FPH:0,useTk?FPLV:0,pd(),TPC.tkKey===tkKey?TPC.tkv:0].join();
   if(TPC.sig===sig)return TPC;
-  const g=new Map();for(const b of m1){const d=Math.floor(b[0]/86400);let a=g.get(d);if(!a)g.set(d,a=[]);a.push(b)}
-  const all=[...g.keys()].sort((a,b)=>a-b),ds=all.slice(-s.days);TPC.have=all.length;
+  const G=tpoGroup(m1,s),g=G.g,ds=G.keys;TPC.have=G.have;TPC.need=G.need;
   const rg=ds.map(d=>{let h=-1e9,l=1e9;for(const b of g.get(d)){h=Math.max(h,b[2]);l=Math.min(l,b[3])}return h-l}).sort((a,b)=>a-b),mn=Math.pow(10,-pd());
   let tk=+s.tick>0?+s.tick:0;
-  if(!tk){const w=Math.max(mn,rg[rg.length>>1]/70),p=Math.pow(10,Math.floor(Math.log10(w))),m=w/p;tk=(m<=1?1:m<=2?2:m<=5?5:10)*p}
+  if(!tk){const w=Math.max(mn,rg[rg.length>>1]/TPM_DIV[mo.mode]),p=Math.pow(10,Math.floor(Math.log10(w))),m=w/p;tk=(m<=1?1:m<=2?2:m<=5?5:10)*p}
   tk=Math.max(mn,tk,rg[rg.length-1]/2000);
-  /* Cỡ hàng giá tự động (≈ range trung vị / 70) phụ thuộc các ngày đang hiển thị. Trước đây nó đổi mỗi lần nạp thêm ngày cũ hoặc sang ngày mới,
-     làm thang giá của chart nhảy (cảm giác "teleport"). Giờ: chỉ chốt khi đã đủ số ngày (hoặc hết lịch sử), rồi giữ nguyên cho tới khi đổi mã / số ngày / cỡ hàng. */
+  /* Cỡ hàng giá tự động (≈ range trung vị / 70 cho ngày, /120 cho tuần, /40 cho phiên) phụ thuộc các nhóm đang hiển thị. Trước đây nó đổi mỗi lần nạp thêm ngày cũ hoặc sang ngày mới,
+     làm thang giá của chart nhảy (cảm giác "teleport"). Giờ: chỉ chốt khi đã đủ số ngày/tuần (hoặc hết lịch sử), rồi giữ nguyên cho tới khi đổi mã / loại / số lượng / cỡ hàng. */
   if(!(+s.tick>0)){
     if(TPC.tkKey===tkKey&&TPC.tkv>0)tk=TPC.tkv;
-    else if(all.length>=s.days+1||m1NoMore){TPC.tkKey=tkKey;TPC.tkv=tk}
+    else if(G.have>=G.need||m1NoMore){TPC.tkKey=tkKey;TPC.tkv=tk}
   }
-  TPC.days=ds.map(d=>({d,T:tpoDay(d,g.get(d),tk,s.per*60,s.va/100,useTk,{vol:s.basis===1,spMin:s.spMin})}));TPC.u=TPC.days.length?TPC.days[0].T.bp:tk;TPC.sig=sig;return TPC;
+  TPC.days=ds.map(k=>{
+    let a0,lab,nm=null,gk=k,ib=3600;
+    if(mo.mode==="week"){a0=(k*7-3)*86400;lab="W "+new Date(a0*1000).toISOString().slice(5,10);ib=0}
+    else if(mo.mode==="session"){const d=Math.floor(k/4),i=k-d*4;a0=d*86400+[0,mo.sL,mo.sN][i]*3600;lab=tdl(d);nm=TPM_SESS[i];gk=d}
+    else{a0=k*86400;lab=tdl(k)}
+    return{d:k,g:gk,lab,nm,T:tpoDay(k,g.get(k),tk,per*60,s.va/100,useTk,{vol:s.basis===1,spMin:s.spMin,a0,ib})};
+  });
+  TPC.u=TPC.days.length?TPC.days[0].T.bp:tk;TPC.sig=sig;return TPC;
 }
 async function tpoLoad(){   // kéo thêm nến M1 cũ (giống fillLeft của chart chính nhưng theo số ngày cần xem)
   if(fillBusy||loading||m1NoMore||!m1.length||SUB()||Date.now()<fillRetry)return;
@@ -113,7 +142,7 @@ const TWD={vi:["CN","T2","T3","T4","T5","T6","T7"],en:["Sun","Mon","Tue","Wed","
 const tdl=d=>{const s=new Date(d*864e5),l=window.I18N?I18N.get():"vi";return s.toISOString().slice(5,10)+" "+(TWD[l]||TWD.vi)[s.getUTCDay()]};
 const tfv=v=>v>=1e6?(v/1e6).toFixed(2)+"M":v>=1e3?(v/1e3).toFixed(1)+"K":String(Math.round(v)),tfd=v=>(v>0?"+":v<0?"-":"")+Math.round(Math.abs(v));
 const tfm=(v,dc)=>Number(v).toFixed(dc);
-function tpoLayout(L0,s){const DW=s.showDelta?10:0,L=[];let u=0;for(const e of L0){const w=e.T.tU+(DW?1+DW:0)+3;L.push({d:e.d,T:e.T,u,w,DW});u+=w}return{L,total:u}}
+function tpoLayout(L0,s){const DW=s.showDelta?10:0,L=[],ses=tpoNorm(s).mode==="session";let u=0,pg=null;for(const e of L0){const gk=e.g!=null?e.g:e.d;if(ses&&pg!=null&&gk!==pg)u+=2;pg=gk;const w=e.T.tU+(DW?1+DW:0)+3;L.push({d:e.d,g:gk,lab:e.lab,nm:e.nm,T:e.T,u,w,DW});u+=w}return{L,total:u}}   // session: chừa thêm khoảng trống giữa hai ngày để khung ngày không dính nhau
 function tpoPaint(g,W,H,AX,BH,L,vw,s,K,px,ch){
   const PW=W-AX,{cw,rh,sx,cp,u}=vw,pal=tpoPal(K.stops,s.cyc,s.outA),Y=p=>H/2-(p-cp)/u*rh,dc=pd(),FN="Space Grotesk,system-ui,sans-serif",f=Math.max(8,Math.min(rh-2,11));
   g.clearRect(0,0,W,H+BH);g.textBaseline="middle";
@@ -125,6 +154,19 @@ function tpoPaint(g,W,H,AX,BH,L,vw,s,K,px,ch){
   g.strokeStyle=K.line;g.beginPath();g.moveTo(PW,0);g.lineTo(PW,H);g.moveTo(0,H);g.lineTo(PW,H);g.stroke();
   let focus=null;const mid=sx+PW/2,labs=[];
   g.save();g.beginPath();g.rect(0,0,PW,H);g.clip();
+  if(tpoNorm(s).mode==="session"){   // khung ngày: gom 3 phiên (Asia / London / New York) của cùng một ngày vào một khung để nhận ra đó là 1 ngày
+    const G=[];let q=null;
+    for(const e of L){if(!q||q.g!==e.g){q={g:e.g,a:e,b:e,top:Infinity,bot:-Infinity,lab:e.lab};G.push(q)}q.b=e;q.top=Math.min(q.top,Y((e.T.lo+e.T.n)*e.T.bp));q.bot=Math.max(q.bot,Y(e.T.lo*e.T.bp))}
+    for(const q of G){
+      const xa=q.a.u*cw-sx-6,xb=(q.b.u+q.b.w-3)*cw-sx+6;if(xb<0||xa>PW)continue;
+      const yt=q.top-(s.showLbl?96:30),yb=q.bot+10+Math.max(s.showDelta?28:0,s.showLbl?72:0);
+      g.save();g.beginPath();g.rect(xa,yt,xb-xa,yb-yt);g.globalAlpha=.06;g.fillStyle=K.acc;g.fill();
+      g.globalAlpha=.85;g.strokeStyle=K.acc;g.lineWidth=1.5;g.stroke();g.restore();
+      g.font="700 12px "+FN;g.textAlign="left";g.textBaseline="middle";   // nhãn ngày: ghim trong vùng nhìn thấy dù đỉnh khung nằm ngoài màn hình
+      const lw=g.measureText(q.lab).width+12,lx=Math.min(Math.max(xa+8,6),Math.max(xa+8,xb-lw-8)),yl=Math.min(Math.max(yt+13,34),Math.max(yt+13,yb-12));
+      g.fillStyle="rgba(10,8,24,.72)";g.fillRect(lx-6,yl-9,lw,18);g.fillStyle=K.acc;g.fillText(q.lab,lx,yl);
+    }
+  }
   for(const e of L){
     const T=e.T,x0=e.u*cw-sx,tW=T.tU*cw,dW=e.DW*cw,vL=x0+tW+cw,xr=e.DW?vL+dW:x0+tW,zx=vL+dW/2;
     if(mid>=e.u*cw&&mid<(e.u+e.w)*cw)focus=e;
@@ -197,7 +239,7 @@ function tpoPaint(g,W,H,AX,BH,L,vw,s,K,px,ch){
   g.restore();
   g.textAlign="left";g.font="700 11px "+FN;g.fillStyle=K.acc;g.fillRect(PW,py-9,AX,18);g.fillStyle="#1a1200";g.fillText(tfm(px,dc),PW+6,py);
   g.fillStyle=K.mut;g.font="11px "+FN;g.textAlign="left";
-  for(const e of L){const x0=e.u*cw-sx;if(x0+60>0&&x0<PW-40)g.fillText(tdl(e.d),Math.max(x0,4),H+BH/2)}
+  const sesM=tpoNorm(s).mode==="session";for(const e of L){const x0=e.u*cw-sx;if(x0+60>0&&x0<PW-40)g.fillText(sesM?e.nm||"":(e.lab||tdl(e.d)),Math.max(x0,4),H+BH/2)}   // session: tên phiên dưới từng profile, ngày nằm trong khung
   if(ch&&ch[0]<PW&&ch[1]<H){
     g.save();g.strokeStyle=K.mut;g.setLineDash([3,3]);g.beginPath();g.moveTo(0,ch[1]);g.lineTo(PW,ch[1]);g.moveTo(ch[0],0);g.lineTo(ch[0],H);g.stroke();g.restore();
     g.fillStyle=K.ink;g.fillRect(PW,ch[1]-9,AX,18);g.fillStyle="#1a1200";g.font="700 11px "+FN;g.fillText(tfm(cp+(H/2-ch[1])/rh*u,dc),PW+6,ch[1]);
@@ -215,7 +257,7 @@ function tpoDraw(){
   if(SUB())return tpoMsg("TPO cần nến M1 trở lên. Hãy chọn khung từ M1 ở tab Chart.");
   const s=tpS(),D=tpoData();
   if(!D||!D.days.length)return tpoMsg(loading?"Đang tải nến…":"Chưa có nến M1 (kiểm tra kết nối cTrader ở tab Kết nối).");
-  if(D.have<s.days+1&&!m1NoMore){tpoLoad();if(Date.now()>=fillRetry)return tpoMsg("Đang tải các ngày trước đó…")}   // vẽ khi đã đủ ngày: vẽ bản dở rồi nạp thêm làm cả chart bị xô lệch
+  if(D.have<D.need&&!m1NoMore){tpoLoad();if(Date.now()>=fillRetry)return tpoMsg("Đang tải các ngày trước đó…")}   // vẽ khi đã đủ ngày: vẽ bản dở rồi nạp thêm làm cả chart bị xô lệch
   const cw=s.cell*s.asp,rh=s.cell,{L,total}=tpoLayout(D.days,s),PW=TPW-TAX,last=L[L.length-1],lp=m1[m1.length-1][4];TV.end=last.u+last.w-3;
   if(TV.cp==null)TV.cp=lp;
   if(TV.follow){TV.sx=(last.u+last.w-3)*cw+TMX-PW;TV.cp=lp}
@@ -223,15 +265,17 @@ function tpoDraw(){
   TV.sx=Math.max(-PW*.5,Math.min(TV.sx,total*cw-PW*.4));
   {const e=L.find(x=>(x.u+x.w)*cw>TV.sx);TV.an=e?{d:e.d,off:TV.sx-e.u*cw,cw}:null}
   const px=BA&&BA.sym===C.sym&&BA.bid>0?BA.bid:lp,K=tpoCol();
-  const f=tpoPaint(tpg,TPW,TPH,TAX,TBH,L,{cw,rh,sx:TV.sx,cp:TV.cp,u:D.u},s,K,px,TV.ch),T=(f||last).T,dc=pd();
-  $("tpoInfo").textContent="O: "+tfm(T.open,dc)+"   H: "+tfm(T.h,dc)+"   L: "+tfm(T.l,dc)+"   C: "+tfm(T.close,dc)
+  const f=tpoPaint(tpg,TPW,TPH,TAX,TBH,L,{cw,rh,sx:TV.sx,cp:TV.cp,u:D.u},s,K,px,TV.ch),fe=f||last,T=fe.T,dc=pd();
+  $("tpoInfo").textContent=(fe.nm?fe.nm+" · ":"")+(fe.lab?fe.lab+"   ":"")+"O: "+tfm(T.open,dc)+"   H: "+tfm(T.h,dc)+"   L: "+tfm(T.l,dc)+"   C: "+tfm(T.close,dc)
     +"   POC: "+tfm((T.lo+T.poc+.5)*T.bp,dc)+"   VA: "+tfm((T.lo+T.vl)*T.bp,dc)+" – "+tfm((T.lo+T.vh+1)*T.bp,dc)
     +(T.ibh!=null?"   IB: "+tfm(T.ibl,dc)+" – "+tfm(T.ibh,dc):"")+"   "+L10("Dạng")+": "+T.shape;
 }
 let tpoRq=0;const tpoRedraw=()=>{tpoRq||(tpoRq=requestAnimationFrame(()=>{tpoRq=0;tpoDraw()}))};
 function tpoSize(){const r=$("tpoCard").getBoundingClientRect(),d=devicePixelRatio||1;if(r.width<2)return;TPW=r.width-12;TPH=r.height-12-TBH;tcv.width=TPW*d;tcv.height=(TPH+TBH)*d;tcv.style.width=TPW+"px";tcv.style.height=(TPH+TBH)+"px";tpg.setTransform(d,0,0,d,0,0);tpoRedraw()}
 new ResizeObserver(tpoSize).observe($("tpoCard"));
-function tpoShow(){tpoSize();$("tpoSym").textContent=C.sym+" · "+tfName(C.tf);tpoRedraw()}
+const tpoLbl=()=>C.sym+" · TPO "+TPM_NAME[tpoNorm(tpS()).mode];
+function tpoShow(){tpoSize();$("tpoSym").textContent=tpoLbl();$("tpoMode").value=tpoNorm(tpS()).mode;tpoRedraw()}
+$("tpoMode").onchange=e=>{TPO_S.mode=e.target.value;saveTP();TV.an=null;TV.follow=true;TV.cp=null;$("tpoLive").classList.add("on");$("tpoSym").textContent=tpoLbl();tpoRedraw()};
 const tcl=(x,lo,hi)=>x<lo?lo:x>hi?hi:x;
 /* Zoom giống chart nến (lightweight-charts):
    - lăn chuột: mỗi nấc đổi ~TPZ (15%) kích thước ô, tính theo deltaY đã chuẩn hoá (pixel/dòng/trang), điểm dưới con trỏ đứng yên;
@@ -281,7 +325,7 @@ tcv.ondblclick=tpoLive;$("tpoLive").onclick=tpoLive;
 $("tpoZi").onclick=()=>{tpoZoom((TPW-TAX)/2,TPH/2,1.25,1.25);saveTP()};$("tpoZo").onclick=()=>{tpoZoom((TPW-TAX)/2,TPH/2,.8,.8);saveTP()};
 $("tpoSq").onclick=()=>{TPO_S.asp=1;saveTP();tpoRedraw()};
 $("tpoSet").onclick=()=>{if(tpoIsFs())tpoSetFs(false);show("tps")};
-setInterval(()=>{if(!tpoOn()&&tpoIsFs())tpoSetFs(false);if(!document.hidden&&tpoOn()){if(TV.follow)$("tpoSym").textContent=C.sym+" · "+tfName(C.tf);tpoRedraw()}},500);
+setInterval(()=>{if(!tpoOn()&&tpoIsFs())tpoSetFs(false);if(!document.hidden&&tpoOn()){if(TV.follow)$("tpoSym").textContent=tpoLbl();tpoRedraw()}},500);
 /* ---- Toàn màn hình cho TPO ----
    Phần tử toàn màn hình là cả #v-tpo (thanh công cụ + chart), nên vẫn dùng được nút zoom / Live / 1:1 trong khi xem.
    Máy tính: dùng Fullscreen API thật (ẩn cả thanh địa chỉ), Esc để thoát. Điện thoại / khi trình duyệt không cho: phủ kín bằng CSS, thoát bằng nút ✕. */
@@ -315,19 +359,23 @@ function tpoPreview(){
   cv.width=W*d;cv.height=H*d;g.setTransform(d,0,0,d,0,0);
   const B=[];let pr=100;
   for(let k=0;k<480;k++){const o=pr,c=100+3.2*Math.sin(k/45)+1.1*Math.sin(k/9+1),hh=Math.max(o,c)+.15+.1*Math.abs(Math.sin(k)),ll=Math.min(o,c)-.15-.1*Math.abs(Math.cos(k));pr=c;B.push([k*60,o,hh,ll,c,40+(k*37)%60])}
-  const T=tpoDay(0,B,.25,s.per*60,s.va/100,false,{vol:s.basis===1,spMin:s.spMin}),{L}=tpoLayout([{d:0,T}],s),cw=s.cell*s.asp,K=tpoCol();
+  const pm=tpoNorm(s).mode,T=tpoDay(0,B,.25,(pm==="day"?s.per:30)*60,s.va/100,false,{vol:s.basis===1,spMin:s.spMin,ib:pm==="week"?0:3600}),{L}=tpoLayout([{d:0,T,lab:"Preview",nm:"Asia"}],s),cw=s.cell*s.asp,K=tpoCol();
   tpoPaint(g,W,H-26,TAX,26,L,{cw,rh:s.cell,sx:-8,cp:B[B.length-1][4]-1,u:T.bp},s,K,B[B.length-1][4],null);
 }
+const PERS={day:[15,30,60],week:[60,120,240,480,1440],session:[10,15,30,60]};
 function buildTPS(){
-  const s=tpS(),K=tpoCol();
+  const s=tpS(),K=tpoCol(),mo=tpoNorm(s),perK=mo.mode==="week"?"perW":mo.mode==="session"?"perS":"per";
   const num=(l,k,mn,mx,st,h)=>`<div class="f"><label for="tp_${k}">${l}</label><input type="number" id="tp_${k}" data-n="${k}" min="${mn}" max="${mx}" step="${st}" value="${s[k]}">${h?`<small>${h}</small>`:""}</div>`;
   const chk=(l,k)=>`<div class="f"><label for="tp_${k}">${l}</label><input type="checkbox" id="tp_${k}" data-t="${k}"${s[k]?" checked":""}></div>`;
   const col=(l,k,v)=>`<div class="f"><label for="tp_${k}">${l}</label><input type="color" id="tp_${k}" data-c="${k}" value="${v}"></div>`;
   $("tpsBody").innerHTML=`<div class="grid"><div class="card"><h2>Ô TPO</h2>`+
    num("Cỡ ô (px)","cell",4,80,1,"Cũng chỉnh được bằng zoom trên chart")+num("Tỉ lệ ngang / dọc","asp",.2,4,.05,"1 = ô vuông")+chk("Hiện chữ cái trong ô","lt")+chk("Open / Close","showOC")+chk("Delta Profile (bên phải)","showDelta")+chk("Single Print","showSp")+chk("Initial Balance (IB)","showIB")+chk("Poor High / Poor Low / đuôi mua-bán","showStruct")+chk("Kéo dài POC / VA / Single Print","showExt")+chk("Nhãn H / L / VAH / VAL / POC","showLbl")+
    `<h2 style="margin-top:16px">Dữ liệu</h2>`+
-   `<div class="f"><label for="tp_per">Chu kỳ mỗi ô (phút)</label><select id="tp_per" data-n="per">${[15,30,60].map(v=>`<option value="${v}"${s.per===v?" selected":""}>${v}</option>`).join("")}</select></div>`+
-   num("Số ngày hiển thị","days",1,15,1,"Tự tải thêm nến M1 cũ nếu thiếu")+num("Kích thước hàng giá","tick",0,1000,"any","0 = tự động (≈ 70 hàng cho 1 ngày)")+num("Value Area (%)","va",50,95,1)+`<div class="f"><label for="tp_basis">Cách tính POC / Value Area</label><select id="tp_basis" data-n="basis"><option value="0"${s.basis!==1?" selected":""}>Số TPO (CME / Dalton)</option><option value="1"${s.basis===1?" selected":""}>Khối lượng</option></select></div>`+num("Single Print tối thiểu (hàng)","spMin",2,10,1,"Dãy tối thiểu bao nhiêu hàng 1-TPO mới tính là Single Print / đuôi")+
+   `<div class="f"><label for="tp_mode">Loại profile</label><select id="tp_mode" data-s="mode"><option value="day"${mo.mode==="day"?" selected":""}>Daily</option><option value="week"${mo.mode==="week"?" selected":""}>Weekly</option><option value="session"${mo.mode==="session"?" selected":""}>Session</option></select><small>${mo.mode==="week"?"Mỗi tuần một profile (thứ Hai – thứ Sáu theo giờ server), không có Initial Balance.":mo.mode==="session"?"Mỗi ngày chia 3 phiên Asia / London / New York, mỗi phiên một profile; 3 phiên của cùng một ngày nằm trong một khung.":"Mỗi ngày server (cắt 17:00 New York) một profile."}</small></div>`+
+   `<div class="f"><label for="tp_per">Chu kỳ mỗi ô (phút)</label><select id="tp_per" data-n="${perK}">${PERS[mo.mode].map(v=>`<option value="${v}"${tpoPer(s)===v?" selected":""}>${v}</option>`).join("")}</select></div>`+
+   (mo.mode==="week"?num("Số tuần hiển thị","weeks",1,8,1,"Tự tải thêm nến M1 cũ nếu thiếu"):num("Số ngày hiển thị","days",1,15,1,"Tự tải thêm nến M1 cũ nếu thiếu"))+
+   (mo.mode==="session"?num("London bắt đầu (giờ server)","sL",1,22,1,"Asia chạy từ 00:00 đến giờ này. Mặc định 9 (≈ 07:00 UTC, mở cửa châu Âu)")+num("New York bắt đầu (giờ server)","sN",2,23,1,"London chạy đến giờ này, New York chạy đến hết ngày. Mặc định 15 (≈ 13:00 UTC). Phải lớn hơn giờ London")+(mo.sL!==+s.sL||mo.sN!==+s.sN?`<div class="f"><small style="color:var(--loss)">Giờ phiên không hợp lệ (London phải nhỏ hơn New York, trong 1–23). Đang dùng mặc định 9 / 15.</small></div>`:""):"")+
+   num("Kích thước hàng giá","tick",0,1000,"any","0 = tự động (≈ 70 hàng cho 1 ngày, nhiều hơn cho tuần, ít hơn cho 1 phiên)")+num("Value Area (%)","va",50,95,1)+`<div class="f"><label for="tp_basis">Cách tính POC / Value Area</label><select id="tp_basis" data-n="basis"><option value="0"${s.basis!==1?" selected":""}>Số TPO (CME / Dalton)</option><option value="1"${s.basis===1?" selected":""}>Khối lượng</option></select></div>`+num("Single Print tối thiểu (hàng)","spMin",2,10,1,"Dãy tối thiểu bao nhiêu hàng 1-TPO mới tính là Single Print / đuôi")+
    `</div><div class="card"><h2>Xem trước</h2><canvas id="tpsPrev" style="width:100%;height:340px;display:block"></canvas>`+
    `<h2 style="margin-top:16px">Màu</h2>`+[0,1,2,3].map(i=>col("Màu ô số "+(i+1),"s"+i,K.stops[i])).join("")+
    num("Số ô cho một vòng màu","cyc",2,48,1,"Màu ô lặp lại sau chừng này nến")+num("Độ đậm ngoài Value Area","outA",.1,1,.05)+
@@ -337,7 +385,8 @@ function buildTPS(){
   tpoPreview();
 }
 $("tpsBody").oninput=$("tpsBody").onchange=e=>{
-  const t=e.target,k=t.dataset.n||t.dataset.t||t.dataset.c;if(!k)return;
+  const t=e.target,k=t.dataset.n||t.dataset.t||t.dataset.c||t.dataset.s;if(!k)return;
+  if(t.dataset.s){TPO_S[k]=t.value;saveTP();TV.an=null;TV.follow=true;TV.cp=null;buildTPS();return}   // đổi loại profile: dựng lại form theo loại
   if(t.dataset.c){if(/^s\d$/.test(k)){const st=(TPO_S.stops||tpoCol().stops).slice();st[+k[1]]=t.value;TPO_S.stops=st}else TPO_S[k]=t.value}
   else if(t.dataset.t)TPO_S[k]=t.checked;
   else{const v=+t.value;if(!isFinite(v)||t.value==="")return;TPO_S[k]=v}

@@ -521,6 +521,24 @@ const T=[
 ["Vàng đơn sắc","Mono gold","单色金"],
 ["Xanh – Tím","Green – Purple","绿 – 紫"],
 ["Live","Live","实时"],
+/* --- TPO Daily / Weekly / Session, Thêm TPO chart --- */
+["Thêm TPO chart", "Add TPO chart", "添加 TPO 图表"],
+["Mỗi TPO chart có mã và cài đặt TPO riêng (Daily / Weekly / Session)", "Each TPO chart has its own symbol and TPO settings (Daily / Weekly / Session)", "每个 TPO 图表有独立的品种和 TPO 设置（Daily / Weekly / Session）"],
+["Loại TPO", "TPO type", "TPO 类型"],
+["TPO Daily (mỗi ngày)", "TPO Daily (per day)", "TPO Daily（按日）"],
+["TPO Weekly (mỗi tuần)", "TPO Weekly (per week)", "TPO Weekly（按周）"],
+["TPO Session (3 phiên / ngày)", "TPO Session (3 sessions / day)", "TPO Session（每日 3 个时段）"],
+["Loại profile", "Profile type", "Profile 类型"],
+["Mỗi tuần một profile (thứ Hai – thứ Sáu theo giờ server), không có Initial Balance.", "One profile per week (Monday – Friday in server time), no Initial Balance.", "每周一个 profile（按服务器时间周一至周五），没有 Initial Balance。"],
+["Mỗi ngày chia 3 phiên Asia / London / New York, mỗi phiên một profile; 3 phiên của cùng một ngày nằm trong một khung.", "Each day is split into 3 sessions, Asia / London / New York, with one profile per session; the 3 sessions of the same day sit inside one frame.", "每天分为亚洲 / 伦敦 / 纽约 3 个时段，每个时段一个 profile；同一天的 3 个时段放在同一个框内。"],
+["Mỗi ngày server (cắt 17:00 New York) một profile.", "One profile per server day (cut at 17:00 New York).", "每个服务器日（纽约 17:00 收盘切换）一个 profile。"],
+["Số tuần hiển thị", "Weeks to show", "显示周数"],
+["London bắt đầu (giờ server)", "London starts (server time)", "伦敦时段开始（服务器时间）"],
+["New York bắt đầu (giờ server)", "New York starts (server time)", "纽约时段开始（服务器时间）"],
+["Asia chạy từ 00:00 đến giờ này. Mặc định 9 (≈ 07:00 UTC, mở cửa châu Âu)", "Asia runs from 00:00 up to this hour. Default 9 (≈ 07:00 UTC, European open)", "亚洲时段从 00:00 到该时刻。默认 9（约 07:00 UTC，欧洲开盘）"],
+["London chạy đến giờ này, New York chạy đến hết ngày. Mặc định 15 (≈ 13:00 UTC). Phải lớn hơn giờ London", "London runs up to this hour, New York until the end of the day. Default 15 (≈ 13:00 UTC). Must be later than the London hour", "伦敦时段到该时刻为止，纽约时段持续到当天结束。默认 15（约 13:00 UTC）。必须晚于伦敦开始时间"],
+["Giờ phiên không hợp lệ (London phải nhỏ hơn New York, trong 1–23). Đang dùng mặc định 9 / 15.", "Invalid session hours (London must be earlier than New York, within 1–23). Using the default 9 / 15.", "时段时间无效（伦敦必须早于纽约，范围 1–23）。当前使用默认值 9 / 15。"],
+["0 = tự động (≈ 70 hàng cho 1 ngày, nhiều hơn cho tuần, ít hơn cho 1 phiên)", "0 = automatic (≈ 70 rows for a day, more for a week, fewer for one session)", "0 = 自动（一天约 70 行，一周更多，单个时段更少）"]
 ];
 
 /* Chữ gốc tiếng Anh trong app: hiển thị bằng tiếng Việt khi chọn Tiếng Việt */
